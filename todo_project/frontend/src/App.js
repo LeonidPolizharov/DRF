@@ -2,7 +2,7 @@ import React from 'react';
 import logo from './logo.svg';
 import './App.css';
 import UserList from './components/User.js';
-import Menu from './components/Menu.js';
+import Navbar from './components/Menu.js';
 import Footer from './components/Footer.js';
 import axios from 'axios'
 import {
