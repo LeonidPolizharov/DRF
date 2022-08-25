@@ -9,9 +9,12 @@ import {
   BrowserRouter as Router,
   Switch,
   Route,
+  Redirect,
+  Link
 } from "react-router-dom";
 import {ProjectList, ProjectDetail} from './components/Project.js'
 import ToDoList from './components/ToDo.js'
+import LoginForm from './components/Auth.js';
 
 const DOMAIN = 'http://127.0.0.1:8001/api/'
 const get_url = (url) => `${DOMAIN}${url}`
@@ -25,6 +28,7 @@ class App extends React.Component {
           {name: 'Users', href: '/'},
           {name: 'Projects', href: '/projects'},
           {name: 'TODOs', href: '/todos'},
+          {name: 'Token', href: '/token'},
       ],
       users: [],
       projects: [],
@@ -33,33 +37,99 @@ class App extends React.Component {
   }
 }
 
-  getProject(id) {
-    axios.get(get_url(`projects/${id}`))
-        .then(response => {
-            console.log(response.data)
-            this.setState({project: response.data})
-        }).catch(error => console.log(error))
-  }
+set_token(token) {
+    const cookies = new Cookies()
+    cookies.set('token', token)
+    this.setState({'token': token}, () => this.load_data())
+}
 
-  componentDidMount() {
-    axios.get(get_url('users/'))
+is_authenticated() {
+    return this.state.token != ''
+}
+
+logout() {
+    this.set_token('')
+}
+
+get_token_from_storage() {
+    const cookies = new Cookies()
+    const token = cookies.get('token')
+    this.setState({'token': token}, () => this.load_data())
+}
+
+get_token(username, password) {
+
+    axios
+        .post('http://127.0.0.1:8000/api-token-auth/', {
+            username: username,
+            password: password
+        })
         .then(response => {
-            this.setState({users: response.data})
-        }).catch(error => console.log(error))
+            this.set_token(response.data['token'])
+            console.log(this.state.token)
+        })
+        .catch(error => alert('Неверный логин или пароль'))
+}
+
+get_headers() {
+    let headers = {
+        'Content-Type': 'application/json'
+    }
+    if (this.is_authenticated()) {
+        headers['Authorization'] = 'Token ' + this.state.token
+    }
+    return headers
+}
+
+load_data() {
+    const headers = this.get_headers()
+    axios
+        .get('http://127.0.0.1:8000/api/users', {headers})
+
+        .then(response => {
+            const users = response.data.results
+            this.setState(
+                {
+                    'users': users
+                }
+            )
+        })
+        .catch(error => {
+            console.log(error)
+            this.setState({users: []})
+        })
 
 
-    axios.get(get_url('projects/'))
+    axios
+        .get('http://127.0.0.1:8000/api/projects', {headers})
         .then(response => {
-            //console.log(response.data)
-            this.setState({projects: response.data.results})
-        }).catch(error => console.log(error))
+            const projects = response.data.results
+            this.setState(
+                {
+                    'projects': projects
+                }
+            )
+        })
+        .catch(error => console.log(error))
 
-    axios.get(get_url('todos/'))
+
+    axios
+        .get('http://127.0.0.1:8000/api/todos', {headers})
         .then(response => {
-            //console.log(response.data)
-            this.setState({todos: response.data.results})
-        }).catch(error => console.log(error))
-  }
+            const todos = response.data.results
+            this.setState(
+                {
+                    'todos': todos
+                }
+            )
+        })
+        .catch(error => console.log(error))
+}
+
+componentDidMount() {
+    this.get_token_from_storage()
+    // this.load_data()
+}
 
   render() {
     return (
@@ -78,6 +148,11 @@ class App extends React.Component {
                         </Route>
                         <Route exact path='/todos'>
                             <ToDoList items={this.state.todos}/>
+                        </Route>
+                        <Route exact path='/login' component={() => <LoginForm
+                                get_token={(username, password) => this.get_token(username, password)}/>}/>
+                            <Route path="/project/:id">
+                                <ProjectPage projects={this.state.projects}/>
                         </Route>
                         <Route path="/project/:id" children={<ProjectDetail getProject={(id) => this.getProject(id)}
                                                                             item={this.state.project}/>}/>
